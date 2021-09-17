@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+
+body {
+  margin: 0;
+  font-size: 16px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.header {
+  background-color: #f1f1f1;
+  padding: 24px;
+  text-align: center;
+  font-size: 24px;
+}
+
+/* Style the tab */
+.tab {
+  overflow: hidden;
+  border: 1px solid #ccc;
+  background-color: #f1f1f1;
+}
+
+/* Style the buttons inside the tab */
+.tab button {
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+  font-size: 16px;
+}
+
+/* Change background color of buttons on hover */
+.tab button:hover {
+  background-color: #ddd;
+}
+
+/* Create an active/current tablink class */
+.tab button.active {
+  background-color: #ccc;
+}
+
+/* Style the tab content */
+.tabcontent {
+  display: none;
+  padding: 6px 12px;
+  -webkit-animation: fadeEffect 1s;
+  animation: fadeEffect 1s;
+}
+
+/* Fade in tabs */
+@-webkit-keyframes fadeEffect {
+  from {opacity: 0;}
+  to {opacity: 1;}
+}
+
+@keyframes fadeEffect {
+  from {opacity: 0;}
+  to {opacity: 1;}
+}
+
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2>Web Indexleme Projesi</h2>
+  <p>Girilen URL'deki metin uzerinde bazi analizler yapmaya yarayan bir program.</p>
+</div>
+
+<div class="tab">
+    <button class="tablinks" onclick="openCity(event, 'Anasayfa')" id="defaultOpen">Anasayfa</button>
+    <button class="tablinks" onclick="openCity(event, 'Kelime Frekanslarini Hesaplama')">Kelime Frekanslarini Hesaplama</button>
+    <button class="tablinks" onclick="openCity(event, 'Anahtar Kelime Cikarma')">Anahtar Kelime Cikarma</button>
+    <button class="tablinks" onclick="openCity(event, 'Benzerlik Skorlamasi')">Benzerlik Skorlamasi</button>
+    <button class="tablinks" onclick="openCity(event, 'Site Indexleme ve Siralama')">Site Indexleme ve Siralama</button>
+    <button class="tablinks" onclick="openCity(event, 'Semantik Analiz')">Semantik Analiz</button>
+</div>
+  
+<div id="Anasayfa" class="tabcontent">
+    <h2># Anasayfa #</h2><br>
+    <h3>> Kelime Frekanslarini Hesaplama</h3>
+    <p>Bu kisim verilen URL icerigindeki her kelimenin kacar defa yer aldigini bulur.</p><br>
+    <h3>> Anahtar Kelime Cikarma</h3>
+    <p>Bu kisim verilen URL icerigindeki anahtar kelimeleri bulur.</p><br>
+    <h3>> Benzerlik Skorlamasi</h3>
+    <p>Bu kisim verilen iki URL arasindaki benzerligi hesaplar.</p><br>
+    <h3>> Site Indexleme ve Siralama</h3>
+    <p>Bu kisim verilen bir URL ve verilen URL kumesi ile bu URL kumesinde bulunan alt URL'ler arasinda benzerlik skorlamasi yapar.</p><br>
+    <h3>> Semantik Analiz</h3>
+    <p>Bu kisim verilen URL icerigindeki anahtar kelimelerle anlamsal yakinlik veya benzerlik iceren kelimeleri tespit eder.</p>
+</div>
+  
+<div id="Kelime Frekanslarini Hesaplama" class="tabcontent">
+    <h2>Kelime Frekanslarini Hesaplama</h2>
+    <p>Bu kisim verilen URL icerigindeki her kelimenin kacar defa yer aldigini bulur.</p>
+    <form action="/kelimefrekansi" method="POST">
+      <input type="text" name="gelen_url" size="50" value="Buraya bir URL girin...">
+      <button type="submit">Hesapla</button>
+    </form>
+</div>
+  
+<div id="Anahtar Kelime Cikarma" class="tabcontent">
+    <h2>Anahtar Kelime Cikarma</h2>
+    <p>Bu kisim verilen URL icerigindeki anahtar kelimeleri bulur.</p>
+    <form action="/anahtarkelime" method="POST">
+      <input type="text" name="gelen_url" size="50" value="Buraya bir URL girin...">
+      <button type="submit">Gonder</button>
+    </form>
+</div>
+
+<div id="Benzerlik Skorlamasi" class="tabcontent">
+  <h2>Benzerlik Skorlamasi</h2>
+  <p>Bu kisim verilen iki URL arasindaki benzerligi hesaplar.</p>
+  <form action="/benzerlikskoru" method="POST">
+    <input type="text" name="gelen_url1" size="50" value="Buraya bir URL girin..."><br><br>
+    <input type="text" name="gelen_url2" size="50" value="Buraya bir URL girin...">
+    <button type="submit">Gonder</button>
+  </form>
+</div>
+  
+<div id="Site Indexleme ve Siralama" class="tabcontent">
+    <h2>Site Indexleme ve Siralama</h2>
+    <p>Bu kisim verilen bir URL ve verilen URL kumesi ile bu URL kumesinde bulunan alt URL'ler arasinda benzerlik skorlamasi yapar.</p>
+    <form action="/siteindexleme" method="POST">
+      <input type="text" name="gelen_url" size="50" value="Buraya bir URL girin..."><br><br>
+      <textarea type="text" name="gelen_url_kumesi" cols="52" rows="10" value="Buraya bir URL kumesi girin..."></textarea>
+      <button type="submit">Gonder</button>
+    </form>
+</div>
+  
+<div id="Semantik Analiz" class="tabcontent">
+    <h2>Semantik Analiz</h2>
+    <p>Bu kisim verilen URL icerigindeki anahtar kelimelerle anlamsal yakinlik veya benzerlik iceren kelimeleri tespit eder.</p>
+    <form action="/semantik" method="POST">
+      <input type="text" name="gelen_url" size="50" value="Buraya bir URL girin...">
+      <button type="submit">Gonder</button>
+    </form>
+</div>
+
+<script>
+    function openCity(evt, cityName) {
+      var i, tabcontent, tablinks;
+      tabcontent = document.getElementsByClassName("tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+      tablinks = document.getElementsByClassName("tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+      document.getElementById(cityName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+    
+    // Get the element with id="defaultOpen" and click on it
+    document.getElementById("defaultOpen").click();
+</script> 
+
+</body>
+</html>

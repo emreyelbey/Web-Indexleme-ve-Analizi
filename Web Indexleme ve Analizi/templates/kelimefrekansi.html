@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelime Frekanslari</title>
+</head>
+<body>
+    <h2>Kelime - Frekansi</h2>
+    <p>Farkli Kelime Sayisi: {{farkli_ks}}</p>
+    <p>Toplam Kelime Sayisi: {{toplam_ks}}</p>
+    <ul>
+        {% for i in range(0, farkli_ks) %}
+            <li>{{frekans[i][0]}} - {{frekans[i][1]}}</li>
+        {% endfor %}
+    </ul>
+    <script>console.log("{{frekans}}")</script>
+</body>
+</html>

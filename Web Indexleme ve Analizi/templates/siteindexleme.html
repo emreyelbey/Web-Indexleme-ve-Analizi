@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Indexleme</title>
+</head>
+<body>
+    <h2>Site Indexleme</h2>
+    {% for i in range(0, tree|length) %}
+        <li>{{tree[i][0]}}  #  {{tree[i][1]}} #  {{tree[i][2]}}</li>
+    {% endfor %}
+    <script>console.log("{{tree}}")</script>
+</body>
+</html>

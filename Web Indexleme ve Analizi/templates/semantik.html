@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantik Analiz</title>
+</head>
+<body>
+    <h2>Semantik Analiz</h2>
+    <p>Anahtar kelimelerle semantik olarak iliskili kelimlere ayni satirda verilmistir.</p>
+    <ul>
+        {%for i in semantikler%}
+            <li>{{i}}</li>
+        {%endfor%}
+    </ul>
+    <script>console.log("{{semantikler}}")</script>
+</body>
+</html>

@@ -1,0 +1,873 @@
+import trafilatura
+from multiprocessing.dummy import Pool as ThreadPool
+from bs4 import BeautifulSoup
+from urllib import request
+import re
+
+katman1links = []
+katman2links = []
+katman3links = []
+
+def get_url(katman1links):
+    for katman1link in katman1links:
+        k = 0
+        katman2save = []
+        try:
+            html_page = request.urlopen(katman1link).read()
+            soup = BeautifulSoup(html_page)
+
+            for link in soup.findAll('a', attrs={'href': re.compile("^https://")}):
+                katman2save.append(link.get('href'))
+                k += 1
+                if (k % 5 == 0):
+                    break
+        except:
+            print("error")
+
+        katman2links.append(katman2save)
+        del katman2save
+
+def get_url2(katman2linklers):
+    for katman2linkler in katman2linklers:
+
+        k = 0
+        katman3save = []
+        for katman2link in katman2linkler:
+            saveci = []
+            try:
+                html_page = request.urlopen(katman2link).read()
+                soup = BeautifulSoup(html_page)
+
+                for link in soup.findAll('a', attrs={'href': re.compile("^https://")}):
+                    sonlink = link.get('href')
+                    saveci.append(sonlink)
+
+                    k += 1
+                    if (k % 5 == 0):
+                        break
+
+            except:
+                print("error")
+            katman3save.append(saveci)
+            del saveci
+        katman3links.append(katman3save)
+        del katman3save
+
+def indexle(gelenUrl, gelenUrlKumesi):
+
+    gelenUrlKumesi = " ".join(gelenUrlKumesi.split())
+    global katman1links
+    global katman2links
+    global katman3links
+    katman1links = gelenUrlKumesi.split()
+
+    get_url(katman1links)
+    get_url2(katman2links)
+
+    for i in range(0, len(katman1links)):
+        print(katman1links[i])
+        for j in range(0, len(katman2links[i])):
+            print('         ', end="")
+            print(katman2links[i][j])
+            for k in range(0, len(katman3links[i][j])):
+                print('                  ', end="")
+                print(katman3links[i][j][k])
+
+    text = 31
+    return text
+
+def ret_katman1():
+    return katman1links
+
+def ret_katman2():
+    return katman2links
+
+def ret_katman3():
+    return katman3links
+
+
+import trafilatura
+import cleaner
+
+from itertools import islice
+from tqdm.notebook import tqdm
+from re import sub
+from sklearn.feature_extraction.text import CountVectorizer
+from numpy import array, log
+
+def anahtar(gelenUrl):
+
+    array_links = []
+    array_links.append(gelenUrl)
+    array_text = []
+
+    for i in array_links:
+        html = trafilatura.fetch_url(i)
+        text = trafilatura.extract(html)
+        text = cleaner.temizle(text)
+        array_text.append(text)
+
+    num_lines = sum(1 for line in open("tfidf.txt"))
+    with open("tfidf.txt") as file:
+        dict_idf = {}
+        with tqdm(total=num_lines) as pbar:
+            for i, line in tqdm(islice(enumerate(file), 1, None)):
+                try:
+                    cells = line.split(",")
+                    idf = float(sub("[^0-9.]", "", cells[3]))
+                    dict_idf[cells[0]] = idf
+                except:
+                    print("Error on: " + line)
+                finally:
+                    pbar.update(1)
+
+    vectorizer = CountVectorizer()
+    tf = vectorizer.fit_transform([x.lower() for x in array_text])
+    tf = tf.toarray()
+    tf = log(tf + 1)
+
+    tfidf = tf.copy()
+    words = array(vectorizer.get_feature_names())
+    for k in tqdm(dict_idf.keys()):
+        if k in words:
+            tfidf[:, words == k] = tfidf[:, words == k] * dict_idf[k]
+        pbar.update(1)
+
+    keywords = words[tfidf[0, :].argsort()[-10:][::-1]]
+    return keywords
+
+import kelimefrekanslari, benzerlikskorlama, anahtar, webindex, semantik, agac
+from flask import Flask, render_template, request, redirect, url_for
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return render_template("index.html")    
+
+@app.route("/kelimefrekansi", methods = ["GET", "POST"])
+def kelimefrekansi():
+    if request.method == "POST":
+        gelenUrl = request.form.get("gelen_url")
+        frekans = kelimefrekanslari.hesapla(gelenUrl)
+        toplam_ks = kelimefrekanslari.ret_toplam_ks(frekans)
+        farkli_ks = kelimefrekanslari.ret_farkli_ks(frekans)
+        return render_template("kelimefrekansi.html", frekans=frekans, toplam_ks=toplam_ks, farkli_ks=farkli_ks)
+    else:
+        return redirect(url_for("home"))
+
+@app.route("/anahtarkelime", methods = ["GET", "POST"])
+def anahtarkelime():
+    if request.method == "POST":
+        gelenUrl = request.form.get("gelen_url")
+        keywords = anahtar.anahtar(gelenUrl)
+        return render_template("anahtarkelime.html", keywords=keywords)
+    else:
+        return redirect(url_for("home"))
+
+@app.route("/benzerlikskoru", methods = ["GET", "POST"])
+def benzerlikskoru():
+    if request.method == "POST":
+        gelenUrl1 = request.form.get("gelen_url1")
+        gelenUrl2 = request.form.get("gelen_url2")
+        skor = benzerlikskorlama.skorla(gelenUrl1, gelenUrl2)
+        url1Keys = benzerlikskorlama.ret_url1keys()
+        url2Keys = benzerlikskorlama.ret_url2keys()
+        return render_template("benzerlikskoru.html", skor=skor, url1Keys=url1Keys, url2Keys=url2Keys)
+    else:
+        return redirect(url_for("home"))
+
+@app.route("/siteindexleme", methods = ["GET", "POST"])
+def siteindexleme():
+    if request.method == "POST":
+        gelenUrl = request.form.get("gelen_url")
+        gelenUrlKumesi = request.form.get("gelen_url_kumesi")
+        tree = webindex.indexle(gelenUrl, gelenUrlKumesi)
+        return render_template("siteindexleme.html", tree=tree)
+    else:
+        return redirect(url_for("home"))
+
+@app.route("/semantik", methods = ["GET", "POST"])
+def semantikanaliz():
+    if request.method == "POST":
+        gelenUrl = request.form.get("gelen_url")
+        semantikler = semantik.analizet(gelenUrl)
+        return render_template("semantik.html", semantikler=semantikler)
+    else:
+        return redirect(url_for("home"))
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+import trafilatura
+import cleaner
+from gensim.models import KeyedVectors
+from itertools import islice
+from tqdm.notebook import tqdm
+from re import sub
+from sklearn.feature_extraction.text import CountVectorizer
+from numpy import array, log
+import nltk
+
+url1_keywords = []
+url2_keywords = []
+
+def skorla(gelenUrl1, gelenUrl2):
+
+    word_vectors = KeyedVectors.load_word2vec_format('eksiwikimodel', binary=True)
+    array_links = []
+    array_links.append(gelenUrl1)
+    array_links.append(gelenUrl2)
+    array_text = []
+
+    for i in array_links:
+        html = trafilatura.fetch_url(i)
+        text = trafilatura.extract(html)
+        text = cleaner.temizle(text)
+        array_text.append(text)
+
+    num_lines = sum(1 for line in open("tfidf.txt"))
+    with open("tfidf.txt") as file:
+        dict_idf = {}
+        with tqdm(total=num_lines) as pbar:
+            for i, line in tqdm(islice(enumerate(file), 1, None)):
+                try:
+                    cells = line.split(",")
+                    idf = float(sub("[^0-9.]", "", cells[3]))
+                    dict_idf[cells[0]] = idf
+                except:
+                    print("Error on: " + line)
+                finally:
+                    pbar.update(1)
+
+    vectorizer = CountVectorizer()
+    tf = vectorizer.fit_transform([x.lower() for x in array_text])
+    tf = tf.toarray()
+    tf = log(tf + 1)
+
+    tfidf = tf.copy()
+    words = array(vectorizer.get_feature_names())
+    for k in tqdm(dict_idf.keys()):
+        if k in words:
+            tfidf[:, words == k] = tfidf[:, words == k] * dict_idf[k]
+        pbar.update(1)
+
+    for j in range(tfidf.shape[0]):
+        print("Keywords of article", str(j+1), words[tfidf[j, :].argsort()[-10:][::-1]])
+
+    keywords1 = words[tfidf[0, :].argsort()[-10:][::-1]]
+    keywords2 = words[tfidf[1, :].argsort()[-10:][::-1]]
+
+    skor = 0
+    for i in range(10):
+        for j in range(i+1, 10):
+            try:
+                point = word_vectors.wv.similarity(w1=keywords1[i], w2=keywords2[j])
+                #print(keywords1[i] + " " + keywords2[j] + " point=" + str(point))
+                skor += point
+            except:
+                print(keywords1[i] + " " + keywords2[j] + "not in vocab")
+
+    global url1_keywords
+    global url2_keywords
+    url1_keywords = keywords1
+    url2_keywords = keywords2
+
+    url1_text = nltk.word_tokenize(array_text[0])
+    url2_text = nltk.word_tokenize(array_text[1])
+
+    for i in range(0, len(url1_keywords)):
+        counter = 0
+        for j in range(0, len(url1_text)):
+            if url1_keywords[i] == url1_text[j]:
+                counter += 1
+        url1_keywords[i] = url1_keywords[i] + ': ' + str(counter) + ' adet'
+
+    for i in range(0, len(url2_keywords)):
+        counter2 = 0
+        for j in range(0, len(url2_text)):
+            if url2_keywords[i] == url2_text[j]:
+                counter2 += 1
+        url2_keywords[i] = url2_keywords[i] + ': ' + str(counter2) + ' adet'
+
+    return skor
+
+def ret_url1keys():
+    return url1_keywords
+
+def ret_url2keys():
+    return url2_keywords
+
+
+import re
+def temizle(s1):
+    s1 = str(s1)
+    regex = re.compile('[^a-zA-Z öçşiğüÖÇŞİĞÜı\n\r\t\b]')
+    s1 = regex.sub('', s1)
+
+    s1 = " ".join(s1.split())
+    s1 = s1.replace("İ", "i")
+    s1 = s1.lower()
+    return s1
+
+
+from bs4 import BeautifulSoup
+from urllib.request import urlopen
+from collections import Counter
+import nltk
+import cleaner
+
+def hesapla(gelenUrl):
+    html = urlopen(gelenUrl).read()
+    soup = BeautifulSoup(html, 'html.parser')
+    s1 = str(soup.get_text())
+    s1 = cleaner.temizle(s1)
+
+    WPT = nltk.WordPunctTokenizer()
+    stop_word_list = nltk.corpus.stopwords.words('turkish')
+    newStopWords = ["bi", "diğer", "a", "acaba", "altı", "altmış", "ama", "ancak", "arada", "artık", "asla", "aslında",
+                    "aslında", "ayrıca", "az", "bana", "bazen", "bazı", "bazıları", "belki", "ben", "benden", "beni",
+                    "benim", "beri", "beş", "bile", "bilhassa", "bin", "bir", "biraz", "birçoğu", "birçok", "biri",
+                    "birisi", "birkaç", "birşey", "biz", "bizden", "bize", "bizi", "bizim", "böyle", "böylece", "bu",
+                    "buna", "bunda", "bundan", "bunlar", "bunları", "bunların", "bunu", "bunun", "burada", "bütün",
+                    "çoğu", "çoğunu", "çok", "çünkü", "da", "daha", "dahi", "dan", "de", "defa", "değil", "diğer",
+                    "diğeri", "diğerleri", "diye", "doksan", "dokuz", "dolayı", "dolayısıyla", "dört", "e", "edecek",
+                    "eden", "ederek", "edilecek", "ediliyor", "edilmesi", "ediyor", "eğer", "elbette", "elli", "en",
+                    "etmesi", "etti", "ettiği", "ettiğini", "fakat", "falan", "filan", "gene", "gereği", "gerek",
+                    "gibi", "göre", "hala", "halde", "halen", "hangi", "hangisi", "hani", "hatta", "hem", "henüz",
+                    "hep", "hepsi", "her", "herhangi", "herkes", "herkese", "herkesi", "herkesin", "hiç", "hiçbir",
+                    "hiçbiri", "i", "ı", "için", "içinde", "iki", "ile", "ilgili", "ise", "işte", "itibaren",
+                    "itibariyle", "kaç", "kadar", "karşın", "kendi", "kendilerine", "kendine", "kendini", "kendisi",
+                    "kendisine", "kendisini", "kez", "ki", "kim", "kime", "kimi", "kimin", "kimisi", "kimse", "kırk",
+                    "madem", "mi", "mı", "milyar", "milyon", "mu", "mü", "nasıl", "ne", "neden", "nedenle", "nerde",
+                    "nerede", "nereye", "neyse", "niçin", "nin", "nın", "niye", "nun", "nün", "o", "öbür", "olan",
+                    "olarak", "oldu", "olduğu", "olduğunu", "olduklarını", "olmadı", "olmadığı", "olmak", "olması",
+                    "olmayan", "olmaz", "olsa", "olsun", "olup", "olur", "olur", "olursa", "oluyor", "on", "ön", "ona",
+                    "önce", "ondan", "onlar", "onlara", "onlardan", "onları", "onların", "onu", "onun", "orada", "öte",
+                    "ötürü", "otuz", "öyle", "oysa", "pek", "rağmen", "sana", "sanki", "sanki", "şayet", "şekilde",
+                    "sekiz", "seksen", "sen", "senden", "seni", "senin", "şey", "şeyden", "şeye", "şeyi", "şeyler",
+                    "şimdi", "siz", "siz", "sizden", "sizden", "size", "sizi", "sizi", "sizin", "sizin", "sonra",
+                    "şöyle", "şu", "şuna", "şunları", "şunu", "ta", "tabii", "tam", "tamam", "tamamen", "tarafından",
+                    "trilyon", "tüm", "tümü", "u", "ü", "üç", "un", "ün", "üzere", "var", "vardı", "ve", "veya", "ya",
+                    "yani", "yapacak", "yapılan", "yapılması", "yapıyor", "yapmak", "yaptı", "yaptığı", "yaptığını",
+                    "yaptıkları", "ye", "yedi", "yerine", "yetmiş", "yi", "yı", "yine", "yirmi", "yoksa", "yu", "yüz",
+                    "zaten", "zira", "zxtest"]
+    stop_word_list.extend(newStopWords)
+
+    tokens = WPT.tokenize(s1)
+    filtered_tokens = [token for token in tokens if token not in stop_word_list]
+    latest = ' '.join(filtered_tokens)
+
+    frekans = Counter(latest.split()).most_common()
+    return frekans
+
+def ret_toplam_ks(frekans):
+    toplam_ks = 0
+    for i in range(0, len(frekans)):
+        toplam_ks += frekans[i][1]
+    return toplam_ks
+
+def ret_farkli_ks(frekans):
+    farkli_ks = len(frekans)
+    return farkli_ks
+
+import trafilatura
+import cleaner
+
+from gensim.models import KeyedVectors
+import anahtar
+import nltk
+
+def analizet(gelenUrl):
+    word_vectors = KeyedVectors.load_word2vec_format('eksiwikimodel', binary=True)
+
+    html = trafilatura.fetch_url(gelenUrl)
+    text = trafilatura.extract(html)
+    text = cleaner.temizle(text)
+    words = nltk.word_tokenize(text)
+    keywords = anahtar.anahtar(gelenUrl)
+    semantikler = keywords
+
+    for i in range(0, len(keywords)):
+        for j in range(0, len(words)):
+            try:
+                if 0.5 < word_vectors.wv.similarity(w1=str(words[j]), w2=str(keywords[i])) < 1:
+                    semantikler[i] = semantikler[i] + ' - ' + words[j]
+            except:
+                print("not in voc")
+
+    return semantikler
+
+
+from itertools import islice
+from tqdm.notebook import tqdm
+from re import sub
+from sklearn.feature_extraction.text import CountVectorizer
+from numpy import array, log
+import numpy as np
+import nltk
+import agac
+
+from operator import itemgetter
+import trafilatura
+from multiprocessing.dummy import Pool as ThreadPool
+from bs4 import BeautifulSoup
+from urllib import request
+import re
+from gensim.models import KeyedVectors
+
+word_vectors = KeyedVectors.load_word2vec_format('eksiwikimodel', binary=True)
+
+num_lines = sum(1 for line in open("tfidf.txt"))
+with open("tfidf.txt") as file:
+    dict_idf = {}
+    with tqdm(total=num_lines) as pbar:
+        for i, line in tqdm(islice(enumerate(file), 1, None)):
+            try:
+                cells = line.split(",")
+                idf = float(sub("[^0-9.]", "", cells[3]))
+                dict_idf[cells[0]] = idf
+            except:
+                print("Error on: " + line)
+            finally:
+                pbar.update(1)
+
+katman2links = []
+katman3links = []
+tumlinks = []
+array_text = []
+array_text1 = []
+array_text2 = []
+array_text3 = []
+
+
+# called by each thread
+def get_url(katman1link):
+    k = 0
+    try:
+        html_page = request.urlopen(katman1link).read()
+        soup = BeautifulSoup(html_page)
+
+        try:
+            text = trafilatura.extract(html_page)
+            regex = re.compile('[^a-zA-Z öçşiğüÖÇŞİĞÜı\n\r\t\b]')
+            text = regex.sub('', text)
+            text = " ".join(text.split())
+            text = text.replace("İ", "i")
+            text = text.lower()
+            array_text.append([katman1link, text])
+            # print(katman1link)
+
+        except:
+            array_text.append("text alinamadi")
+
+        for link in soup.findAll('a', attrs={'href': re.compile("^https://")}):
+            katman2links.append(link.get('href'))
+
+            try:
+                html = request.urlopen(link.get('href')).read()
+                text = trafilatura.extract(html)
+                regex = re.compile('[^a-zA-Z öçşiğüÖÇŞİĞÜı\n\r\t\b]')
+                text = regex.sub('', text)
+                text = " ".join(text.split())
+                text = text.replace("İ", "i")
+                text = text.lower()
+                array_text.append([link.get('href'), text])
+
+            except:
+                array_text.append("text alinamadi")
+            k += 1
+            if k == 2:
+                break
+    except:
+        print("error")
+
+
+def get_url2(katman2link):
+    k = 0
+    try:
+        html_page = request.urlopen(katman2link).read()
+        soup = BeautifulSoup(html_page)
+
+        for link in soup.findAll('a', attrs={'href': re.compile("^https://")}):
+            katman3links.append(link.get('href'))
+
+            try:
+                html = request.urlopen(link.get('href')).read()
+                text = trafilatura.extract(html)
+                regex = re.compile('[^a-zA-Z öçşiğüÖÇŞİĞÜı\n\r\t\b]')
+                text = regex.sub('', text)
+                text = " ".join(text.split())
+                text = text.replace("İ", "i")
+                text = text.lower()
+                array_text.append([link.get('href'), text])
+
+            except:
+                array_text.append("text alinamadi")
+            k += 1
+            if k == 2:
+                break
+    except:
+        print("exceppppttt")
+
+
+def indexle(gelenUrl, gelenUrlKumesi):
+    gelenUrlKumesi = " ".join(gelenUrlKumesi.split())
+    print("00000000000000000000000000000000000000000000000")
+    # print(gelenUrlKumesi)
+    katman1links = gelenUrlKumesi.split()
+    # print(katman1links)
+
+    html_page = request.urlopen(gelenUrl).read()
+    text = trafilatura.extract(html_page)
+    regex = re.compile('[^a-zA-Z öçşiğüÖÇŞİĞÜı\n\r\t\b]')
+    text = regex.sub('', text)
+    text = " ".join(text.split())
+    text = text.replace("İ", "i")
+    text = text.lower()
+    array_text.append([gelenUrl, text])
+
+    pool = ThreadPool(16)
+    # pool.map(get_url, gelenUrl)
+    pool.map(get_url, katman1links)
+    pool.map(get_url2, katman2links)
+    tumlinks = katman1links + katman2links + katman3links
+
+    pool.close()
+    pool.join()
+    #################################################
+
+    vectorizer = CountVectorizer()
+    tf = vectorizer.fit_transform([row[1] for row in array_text])
+    tf = tf.toarray()
+    tf = log(tf + 1)
+
+    tfidf = tf.copy()
+    words = array(vectorizer.get_feature_names())
+    for k in tqdm(dict_idf.keys()):
+        if k in words:
+            tfidf[:, words == k] = tfidf[:, words == k] * dict_idf[k]
+        pbar.update(1)
+
+    wordlist = []
+    for k in range(0, len(array_text)):
+        wordlist.append(words[tfidf[k, :].argsort()[-10:][::-1]])
+
+    newwords = []
+    for words in wordlist:
+        save = []
+        for word in words:
+            save.append(word)
+        newwords.append(save)
+        del save
+
+    totalpoint = 0
+    listofindexing = []
+    katsayi = 1
+    for k in range(1, len(array_text)):
+        if k < 1 + len(katman1links):
+            katsayi = 20
+        elif k > 1 + len(katman1links) and k < 1 + len(katman1links) + len(katman2links):
+            katsayi = 7
+        else:
+            katsayi = 3
+        for i in range(10):
+            for j in range(i + 1, 10):
+                try:
+                    point = word_vectors.wv.similarity(w1=wordlist[0][i], w2=wordlist[k][j])
+                    # print(wordlist[0][i] + " " + wordlist[k][j] + " point=" + str(point))
+                    totalpoint += (katsayi * point)
+                except:
+                    pass
+
+        for i in range(0, len(array_text[k][1])):
+            text_kelimeler = nltk.word_tokenize(array_text[k][1])
+
+        for i in range(0, len(newwords[k])):
+            counter = 0
+            for j in range(0, len(text_kelimeler)):
+                if newwords[k][i] == text_kelimeler[j]:
+                    counter += 1
+            newwords[k][i] = newwords[k][i] + ': ' + str(counter) + ' adet'
+
+        listofindexing.append([array_text[k][0], totalpoint, newwords[k]])
+        # print(listofindexing[k-1])
+        totalpoint = 0
+
+    sortedlist = sorted(listofindexing, key=itemgetter(1), reverse=True)
+    # print(listofindexing)
+    print(sortedlist)
+
+    agac.indexle(gelenUrl, gelenUrlKumesi)
+    return sortedlist
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anahtar Kelimeler</title>
+</head>
+<body>
+    <h2>Anahtar Kelimeler</h2>
+    <ul>
+        {%for i in keywords%}
+            <li>{{i}}</li>
+        {%endfor%}
+    </ul>
+    <script>console.log("{{keywords}}")</script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benzerlik Skoru</title>
+</head>
+<body>
+    <h2>Benzerlik Skoru</h2>
+    <p>Sayfalar arasindaki benzerlik skoru: {{skor}}</p>
+    <p>1. URL'nin anahtar kelimeleri ve bulunma sayilari:</p>
+    <p>{{url1Keys}}</p>
+    <p>2. URL'nin anahtar kelimeleri ve bulunma sayilari:</p>
+    <p>{{url2Keys}}</p>
+    <script>console.log("{{skor}}")</script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+
+body {
+  margin: 0;
+  font-size: 16px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.header {
+  background-color: #f1f1f1;
+  padding: 24px;
+  text-align: center;
+  font-size: 24px;
+}
+
+/* Style the tab */
+.tab {
+  overflow: hidden;
+  border: 1px solid #ccc;
+  background-color: #f1f1f1;
+}
+
+/* Style the buttons inside the tab */
+.tab button {
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+  font-size: 16px;
+}
+
+/* Change background color of buttons on hover */
+.tab button:hover {
+  background-color: #ddd;
+}
+
+/* Create an active/current tablink class */
+.tab button.active {
+  background-color: #ccc;
+}
+
+/* Style the tab content */
+.tabcontent {
+  display: none;
+  padding: 6px 12px;
+  -webkit-animation: fadeEffect 1s;
+  animation: fadeEffect 1s;
+}
+
+/* Fade in tabs */
+@-webkit-keyframes fadeEffect {
+  from {opacity: 0;}
+  to {opacity: 1;}
+}
+
+@keyframes fadeEffect {
+  from {opacity: 0;}
+  to {opacity: 1;}
+}
+
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2>Web Indexleme Projesi</h2>
+  <p>Girilen URL'deki metin uzerinde bazi analizler yapmaya yarayan bir program.</p>
+</div>
+
+<div class="tab">
+    <button class="tablinks" onclick="openCity(event, 'Anasayfa')" id="defaultOpen">Anasayfa</button>
+    <button class="tablinks" onclick="openCity(event, 'Kelime Frekanslarini Hesaplama')">Kelime Frekanslarini Hesaplama</button>
+    <button class="tablinks" onclick="openCity(event, 'Anahtar Kelime Cikarma')">Anahtar Kelime Cikarma</button>
+    <button class="tablinks" onclick="openCity(event, 'Benzerlik Skorlamasi')">Benzerlik Skorlamasi</button>
+    <button class="tablinks" onclick="openCity(event, 'Site Indexleme ve Siralama')">Site Indexleme ve Siralama</button>
+    <button class="tablinks" onclick="openCity(event, 'Semantik Analiz')">Semantik Analiz</button>
+</div>
+  
+<div id="Anasayfa" class="tabcontent">
+    <h2># Anasayfa #</h2><br>
+    <h3>> Kelime Frekanslarini Hesaplama</h3>
+    <p>Bu kisim verilen URL icerigindeki her kelimenin kacar defa yer aldigini bulur.</p><br>
+    <h3>> Anahtar Kelime Cikarma</h3>
+    <p>Bu kisim verilen URL icerigindeki anahtar kelimeleri bulur.</p><br>
+    <h3>> Benzerlik Skorlamasi</h3>
+    <p>Bu kisim verilen iki URL arasindaki benzerligi hesaplar.</p><br>
+    <h3>> Site Indexleme ve Siralama</h3>
+    <p>Bu kisim verilen bir URL ve verilen URL kumesi ile bu URL kumesinde bulunan alt URL'ler arasinda benzerlik skorlamasi yapar.</p><br>
+    <h3>> Semantik Analiz</h3>
+    <p>Bu kisim verilen URL icerigindeki anahtar kelimelerle anlamsal yakinlik veya benzerlik iceren kelimeleri tespit eder.</p>
+</div>
+  
+<div id="Kelime Frekanslarini Hesaplama" class="tabcontent">
+    <h2>Kelime Frekanslarini Hesaplama</h2>
+    <p>Bu kisim verilen URL icerigindeki her kelimenin kacar defa yer aldigini bulur.</p>
+    <form action="/kelimefrekansi" method="POST">
+      <input type="text" name="gelen_url" size="50" value="Buraya bir URL girin...">
+      <button type="submit">Hesapla</button>
+    </form>
+</div>
+  
+<div id="Anahtar Kelime Cikarma" class="tabcontent">
+    <h2>Anahtar Kelime Cikarma</h2>
+    <p>Bu kisim verilen URL icerigindeki anahtar kelimeleri bulur.</p>
+    <form action="/anahtarkelime" method="POST">
+      <input type="text" name="gelen_url" size="50" value="Buraya bir URL girin...">
+      <button type="submit">Gonder</button>
+    </form>
+</div>
+
+<div id="Benzerlik Skorlamasi" class="tabcontent">
+  <h2>Benzerlik Skorlamasi</h2>
+  <p>Bu kisim verilen iki URL arasindaki benzerligi hesaplar.</p>
+  <form action="/benzerlikskoru" method="POST">
+    <input type="text" name="gelen_url1" size="50" value="Buraya bir URL girin..."><br><br>
+    <input type="text" name="gelen_url2" size="50" value="Buraya bir URL girin...">
+    <button type="submit">Gonder</button>
+  </form>
+</div>
+  
+<div id="Site Indexleme ve Siralama" class="tabcontent">
+    <h2>Site Indexleme ve Siralama</h2>
+    <p>Bu kisim verilen bir URL ve verilen URL kumesi ile bu URL kumesinde bulunan alt URL'ler arasinda benzerlik skorlamasi yapar.</p>
+    <form action="/siteindexleme" method="POST">
+      <input type="text" name="gelen_url" size="50" value="Buraya bir URL girin..."><br><br>
+      <textarea type="text" name="gelen_url_kumesi" cols="52" rows="10" value="Buraya bir URL kumesi girin..."></textarea>
+      <button type="submit">Gonder</button>
+    </form>
+</div>
+  
+<div id="Semantik Analiz" class="tabcontent">
+    <h2>Semantik Analiz</h2>
+    <p>Bu kisim verilen URL icerigindeki anahtar kelimelerle anlamsal yakinlik veya benzerlik iceren kelimeleri tespit eder.</p>
+    <form action="/semantik" method="POST">
+      <input type="text" name="gelen_url" size="50" value="Buraya bir URL girin...">
+      <button type="submit">Gonder</button>
+    </form>
+</div>
+
+<script>
+    function openCity(evt, cityName) {
+      var i, tabcontent, tablinks;
+      tabcontent = document.getElementsByClassName("tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+      tablinks = document.getElementsByClassName("tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+      document.getElementById(cityName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+    
+    // Get the element with id="defaultOpen" and click on it
+    document.getElementById("defaultOpen").click();
+</script> 
+
+</body>
+</html>
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelime Frekanslari</title>
+</head>
+<body>
+    <h2>Kelime - Frekansi</h2>
+    <p>Farkli Kelime Sayisi: {{farkli_ks}}</p>
+    <p>Toplam Kelime Sayisi: {{toplam_ks}}</p>
+    <ul>
+        {% for i in range(0, farkli_ks) %}
+            <li>{{frekans[i][0]}} - {{frekans[i][1]}}</li>
+        {% endfor %}
+    </ul>
+    <script>console.log("{{frekans}}")</script>
+</body>
+</html>
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantik Analiz</title>
+</head>
+<body>
+    <h2>Semantik Analiz</h2>
+    <p>Anahtar kelimelerle semantik olarak iliskili kelimlere ayni satirda verilmistir.</p>
+    <ul>
+        {%for i in semantikler%}
+            <li>{{i}}</li>
+        {%endfor%}
+    </ul>
+    <script>console.log("{{semantikler}}")</script>
+</body>
+</html>
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Indexleme</title>
+</head>
+<body>
+    <h2>Site Indexleme</h2>
+    {% for i in range(0, tree|length) %}
+        <li>{{tree[i][0]}}  #  {{tree[i][1]}} #  {{tree[i][2]}}</li>
+    {% endfor %}
+    <script>console.log("{{tree}}")</script>
+</body>
+</html>
